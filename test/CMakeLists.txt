@@ -29,5 +29,12 @@ target_link_libraries(expressionist_tests PRIVATE
   doctest::doctest
 )
 
+if(MSVC)
+  # doctest 2.4.11 declares a std::tuple specialization that the latest MSVC
+  # flags as C5285 (forbidden by N5014) under C++20. It is benign and lives
+  # entirely inside the dependency's header, so silence just that code here.
+  target_compile_options(expressionist_tests PRIVATE /wd5285)
+endif()
+
 include(${doctest_SOURCE_DIR}/scripts/cmake/doctest.cmake)
 doctest_discover_tests(expressionist_tests)
