@@ -1,5 +1,10 @@
 # Expressionist
 
+[![CI](https://github.com/pbosetti/Expressionist/actions/workflows/ci.yml/badge.svg)](https://github.com/pbosetti/Expressionist/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
+[![Header-only](https://img.shields.io/badge/header--only-yes-brightgreen.svg)](src/expressionist.hpp)
+
 A small, header-only **C++20** library that evaluates algebraic expressions
 embedded in [`nlohmann::json`](https://github.com/nlohmann/json) fields,
 replacing them in place with their computed values. Variables in an expression
@@ -57,7 +62,7 @@ context*.
 include(FetchContent)
 FetchContent_Declare(
   Expressionist
-  GIT_REPOSITORY https://github.com/paolobosetti/Expressionist.git
+  GIT_REPOSITORY https://github.com/pbosetti/Expressionist.git
   GIT_TAG        main
 )
 FetchContent_MakeAvailable(Expressionist)

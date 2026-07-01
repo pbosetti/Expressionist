@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux (Clang)
+            os: ubuntu-latest
+            cc: clang
+            cxx: clang++
+          - name: macOS (Clang)
+            os: macos-latest
+            cc: clang
+            cxx: clang++
+          - name: Windows (MSVC)
+            os: windows-latest
+            cc: cl
+            cxx: cl
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install CMake and Ninja
+        uses: lukka/get-cmake@latest
+
+      - name: Set up MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: >
+          cmake -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DEXPRESSIONIST_BUILD_TESTS=ON
+          -DEXPRESSIONIST_BUILD_TOOL=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Smoke-test CLI (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          ./build/expressionist '{"a":1,"b":2,"c":"$a + b"}'
+          echo '{"a":2,"c":"$a * 3"}' | ./build/expressionist --method recursive --compact
+
+      - name: Smoke-test CLI (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          ./build/expressionist.exe '{"a":1,"b":2,"c":"$a + b"}'
