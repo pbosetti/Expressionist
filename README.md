@@ -14,15 +14,15 @@ spreadsheet of interdependent values.
 ```jsonc
 // input                             // output (after evaluate)
 {                                    {
-  "a": 1,                             "a": 1,
-  "b": 2,                             "b": 2,
-  "c": "$a + b",                      "c": 3,
-  "d": "plain string",               "d": "plain string",
-  "f": "$pi/3",                       "f": 1.0471975511965976,
-  "g": "$sin(f) * b",                "g": 1.7320508075688772,
-  "h": true,                          "h": true,
-  "i": false,                         "i": false,
-  "j": "$h && i"                      "j": false
+  "a": 1,                              "a": 1,
+  "b": 2,                              "b": 2,
+  "c": "$a + b",                       "c": 3,
+  "d": "plain string",                 "d": "plain string",
+  "f": "$pi/3",                        "f": 1.0471975511965976,
+  "g": "$sin(f) * b",                  "g": 1.7320508075688772,
+  "h": true,                           "h": true,
+  "i": false,                          "i": false,
+  "j": "$h && i"                       "j": false
 }                                    }
 ```
 
@@ -85,11 +85,28 @@ Copy `src/expressionist.hpp` into your include path and make sure
 #include <iostream>
 
 int main() {
-  nlohmann::json data = nlohmann::json::parse(R"({
+  std::string json_text = R"({
     "a": 1,
     "b": 2,
     "c": "$a + b",
     "f": "$pi / 3",
+    "g": "$sin(f) * b"
+  })";
+
+  // Instantiate with a json object
+  nlohmann::json data = nlohmann::json::parse(json_text);
+  Expressionist::Expressionist ex1(data);
+  ex1.evaluate();            // mutate the stored object in place
+  std::cout << ex1.object().dump(2) << '\n';
+  
+  // or, equivalently, with a string:
+  Expressionist::Expressionist ex2(json_text);
+  ex2.evaluate();            // mutate the stored object in place
+  std::cout << ex2.object().dump(2) << '\n';
+}
+```
+
+Use `produce()` when you want a new object and need to keep the original intact:
     "g": "$sin(f) * b"
   })");
 
