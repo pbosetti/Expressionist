@@ -106,15 +106,6 @@ int main(int argc, char **argv) {
     return 2;
   }
 
-  // // --- Parse JSON ----------------------------------------------------------
-  // nlohmann::json input;
-  // try {
-  //   input = nlohmann::json::parse(input_text);
-  // } catch (const std::exception &e) {
-  //   std::cerr << "expressionist: invalid JSON: " << e.what() << "\n";
-  //   return 1;
-  // }
-
   // --- Evaluate ------------------------------------------------------------
   nlohmann::json output;
   try {
