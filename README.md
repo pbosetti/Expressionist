@@ -117,9 +117,9 @@ ex.setEvalMethod(EvalMethod::GRAPH);      // switch at any time
 
 Both strategies produce identical results:
 
-- `EvalMethod::GRAPH` (default) builds a dependency graph and evaluates it in
+- `EvalMethod::GRAPH` builds a dependency graph and evaluates it in
   topological order (Kahn's algorithm).
-- `EvalMethod::RECURSIVE` evaluates lazily with memoization and a visiting-set
+- `EvalMethod::RECURSIVE` (default) evaluates lazily with memoization and a visiting-set
   for cycle detection.
 
 ### Changing the tag
