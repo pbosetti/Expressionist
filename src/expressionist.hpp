@@ -171,9 +171,9 @@ enum class TokType {
 struct Token {
   TokType type;
   std::string text;
-  Value value;      // valid when type == Number
-  std::size_t pos;  // position in the source expression
-}; // struct Token
+  Value value;     // valid when type == Number
+  std::size_t pos; // position in the source expression
+};                 // struct Token
 
 class Tokenizer {
 public:
@@ -245,9 +245,9 @@ private:
 
   Token read_ident() {
     std::size_t start = _i;
-    while (_i < _src.size() &&
-           (std::isalnum(static_cast<unsigned char>(_src[_i])) ||
-            _src[_i] == '_'))
+    while (
+        _i < _src.size() &&
+        (std::isalnum(static_cast<unsigned char>(_src[_i])) || _src[_i] == '_'))
       ++_i;
     return {TokType::Ident, _src.substr(start, _i - start), Value{}, start};
   }
@@ -258,24 +258,41 @@ private:
     auto two = [&](char a, char b) {
       return _i + 1 < _src.size() && _src[_i] == a && _src[_i + 1] == b;
     };
-    if (two('<', '=')) return _i += 2, Token{TokType::Le, "<=", {}, start};
-    if (two('>', '=')) return _i += 2, Token{TokType::Ge, ">=", {}, start};
-    if (two('=', '=')) return _i += 2, Token{TokType::EqEq, "==", {}, start};
-    if (two('!', '=')) return _i += 2, Token{TokType::NotEq, "!=", {}, start};
-    if (two('&', '&')) return _i += 2, Token{TokType::And, "&&", {}, start};
-    if (two('|', '|')) return _i += 2, Token{TokType::Or, "||", {}, start};
+    if (two('<', '='))
+      return _i += 2, Token{TokType::Le, "<=", {}, start};
+    if (two('>', '='))
+      return _i += 2, Token{TokType::Ge, ">=", {}, start};
+    if (two('=', '='))
+      return _i += 2, Token{TokType::EqEq, "==", {}, start};
+    if (two('!', '='))
+      return _i += 2, Token{TokType::NotEq, "!=", {}, start};
+    if (two('&', '&'))
+      return _i += 2, Token{TokType::And, "&&", {}, start};
+    if (two('|', '|'))
+      return _i += 2, Token{TokType::Or, "||", {}, start};
     switch (c) {
-    case '+': return ++_i, Token{TokType::Plus, "+", {}, start};
-    case '-': return ++_i, Token{TokType::Minus, "-", {}, start};
-    case '*': return ++_i, Token{TokType::Star, "*", {}, start};
-    case '/': return ++_i, Token{TokType::Slash, "/", {}, start};
-    case '^': return ++_i, Token{TokType::Caret, "^", {}, start};
-    case '(': return ++_i, Token{TokType::LParen, "(", {}, start};
-    case ')': return ++_i, Token{TokType::RParen, ")", {}, start};
-    case ',': return ++_i, Token{TokType::Comma, ",", {}, start};
-    case '<': return ++_i, Token{TokType::Lt, "<", {}, start};
-    case '>': return ++_i, Token{TokType::Gt, ">", {}, start};
-    case '!': return ++_i, Token{TokType::Not, "!", {}, start};
+    case '+':
+      return ++_i, Token{TokType::Plus, "+", {}, start};
+    case '-':
+      return ++_i, Token{TokType::Minus, "-", {}, start};
+    case '*':
+      return ++_i, Token{TokType::Star, "*", {}, start};
+    case '/':
+      return ++_i, Token{TokType::Slash, "/", {}, start};
+    case '^':
+      return ++_i, Token{TokType::Caret, "^", {}, start};
+    case '(':
+      return ++_i, Token{TokType::LParen, "(", {}, start};
+    case ')':
+      return ++_i, Token{TokType::RParen, ")", {}, start};
+    case ',':
+      return ++_i, Token{TokType::Comma, ",", {}, start};
+    case '<':
+      return ++_i, Token{TokType::Lt, "<", {}, start};
+    case '>':
+      return ++_i, Token{TokType::Gt, ">", {}, start};
+    case '!':
+      return ++_i, Token{TokType::Not, "!", {}, start};
     default:
       throw ExpressionistException("Unexpected character '" +
                                    std::string(1, c) + "' at position " +
@@ -299,7 +316,7 @@ struct Node {
   std::string name;                            // Ident / Call name
   TokType op = TokType::End;                   // Unary / Binary operator
   std::vector<std::shared_ptr<Node>> children; // operands / call arguments
-}; // struct Node
+};                                             // struct Node
 
 using NodePtr = std::shared_ptr<Node>;
 
@@ -692,7 +709,8 @@ private:
       // Register every member first so sibling references resolve regardless of
       // definition order.
       for (auto it = value.begin(); it != value.end(); ++it)
-        scope->keys[it.key()] = add_cell(it.value(), scope, join(path, it.key()));
+        scope->keys[it.key()] =
+            add_cell(it.value(), scope, join(path, it.key()));
       // Then descend into nested containers for their own scopes / inner cells.
       for (auto it = value.begin(); it != value.end(); ++it)
         if (it.value().is_object() || it.value().is_array())
@@ -741,8 +759,8 @@ private:
 
   // Add the offending cell's location once, avoiding duplicate prefixes as the
   // exception unwinds through nested evaluations.
-  [[noreturn]] void rethrow_with_context(const Cell &c,
-                                         const ExpressionistException &e) const {
+  [[noreturn]] void
+  rethrow_with_context(const Cell &c, const ExpressionistException &e) const {
     std::string msg = e.what();
     if (msg.rfind("In '", 0) == 0)
       throw e;
@@ -846,8 +864,8 @@ private:
       for (std::size_t i : expr_cells)
         if (_cells[i].state != 2)
           names += _cells[i].name + " ";
-      throw ExpressionistException(
-          "Circular dependency detected among: " + names);
+      throw ExpressionistException("Circular dependency detected among: " +
+                                   names);
     }
   }
 
@@ -892,9 +910,19 @@ private:
 
 class Expressionist {
 public:
-  Expressionist(json o, EvalMethod method = EvalMethod::GRAPH)
+  Expressionist(json o, EvalMethod method = EvalMethod::RECURSIVE)
       : _object(std::move(o)), _evalMethod(method),
         _symbols(detail::default_symbols()) {}
+  Expressionist(std::string s, EvalMethod method = EvalMethod::RECURSIVE)
+      : _evalMethod(method), _symbols(detail::default_symbols()) {
+    try {
+      _object = json::parse(s);
+    } catch (const std::exception &e) {
+      throw ExpressionistException("Failed to parse JSON: " +
+                                   std::string(e.what()));
+    }
+  }
+
   ~Expressionist() = default;
 
   // Evaluate in place, mutating the stored object. Throws
@@ -933,7 +961,7 @@ public:
 
 private:
   json _object = json::object();
-  EvalMethod _evalMethod = EvalMethod::GRAPH;
+  EvalMethod _evalMethod = EvalMethod::RECURSIVE;
   std::string _tag = "$";
   detail::Symbols _symbols;
 }; // class Expressionist

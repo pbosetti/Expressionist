@@ -106,19 +106,19 @@ int main(int argc, char **argv) {
     return 2;
   }
 
-  // --- Parse JSON ----------------------------------------------------------
-  nlohmann::json input;
-  try {
-    input = nlohmann::json::parse(input_text);
-  } catch (const std::exception &e) {
-    std::cerr << "expressionist: invalid JSON: " << e.what() << "\n";
-    return 1;
-  }
+  // // --- Parse JSON ----------------------------------------------------------
+  // nlohmann::json input;
+  // try {
+  //   input = nlohmann::json::parse(input_text);
+  // } catch (const std::exception &e) {
+  //   std::cerr << "expressionist: invalid JSON: " << e.what() << "\n";
+  //   return 1;
+  // }
 
   // --- Evaluate ------------------------------------------------------------
   nlohmann::json output;
   try {
-    Expressionist::Expressionist ex(std::move(input), method);
+    Expressionist::Expressionist ex(std::move(input_text), method);
     ex.setTag(args["tag"].as<std::string>());
     output = ex.produce();
   } catch (const Expressionist::ExpressionistException &e) {
