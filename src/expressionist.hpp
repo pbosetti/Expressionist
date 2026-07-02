@@ -922,6 +922,8 @@ public:
                                    std::string(e.what()));
     }
   }
+  Expressionist(EvalMethod method = EvalMethod::RECURSIVE)
+      : _evalMethod(method), _symbols(detail::default_symbols()) {}
 
   ~Expressionist() = default;
 
@@ -932,9 +934,24 @@ public:
     ev.run(_object);
   }
 
+  // Evaluate in place, mutating the referenced object. Throws
+  // ExpressionistException (with context) on any failure.
+  void evaluate(json &object) const {
+    detail::Evaluator ev(_symbols, _tag, _evalMethod);
+    ev.run(object);
+  }
+
   // Like evaluate(), but returns a new object and leaves the original intact.
   json produce() const {
     json copy = _object;
+    detail::Evaluator ev(_symbols, _tag, _evalMethod);
+    ev.run(copy);
+    return copy;
+  }
+
+  // Like evaluate(), but returns a new object and leaves the original intact.
+  json produce(json object) const {
+    json copy = object;
     detail::Evaluator ev(_symbols, _tag, _evalMethod);
     ev.run(copy);
     return copy;
