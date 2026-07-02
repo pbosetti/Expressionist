@@ -5,6 +5,8 @@
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
 [![Header-only](https://img.shields.io/badge/header--only-yes-brightgreen.svg)](src/expressionist.hpp)
 
+![Expressionist](https://raw.githubusercontent.com/pbosetti/Expressionist/main/docs/Expressionist.png)
+
 A small, header-only **C++20** library that evaluates algebraic expressions
 embedded in [`nlohmann::json`](https://github.com/nlohmann/json) fields,
 replacing them in place with their computed values. Variables in an expression
