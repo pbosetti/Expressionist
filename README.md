@@ -99,20 +99,11 @@ int main() {
   ex1.evaluate();            // mutate the stored object in place
   std::cout << ex1.object().dump(2) << '\n';
   
-  // or, equivalently, with a string:
+  // or, equivalently, from a string (a bare string literal works too — it is
+  // parsed as JSON rather than stored as a string value):
   Expressionist::Expressionist ex2(json_text);
   ex2.evaluate();            // mutate the stored object in place
   std::cout << ex2.object().dump(2) << '\n';
-}
-```
-
-Use `produce()` when you want a new object and need to keep the original intact:
-    "g": "$sin(f) * b"
-  })");
-
-  Expressionist::Expressionist ex(data);
-  ex.evaluate();                          // mutate the stored object in place
-  std::cout << ex.object().dump(2) << '\n';
 }
 ```
 
@@ -121,6 +112,25 @@ Use `produce()` when you want a new object and need to keep the original intact:
 ```cpp
 Expressionist::Expressionist ex(data);
 nlohmann::json result = ex.produce();     // `data` is left unchanged
+```
+
+### Evaluating a separate object
+
+An engine can also evaluate an object supplied at call time instead of the one
+it stores. Construct it with just a strategy — the stored object stays empty —
+and pass the target to `evaluate(json&)` (mutates it in place) or `produce(json)`
+(returns an evaluated copy). Both reuse the engine's configured tag and symbol
+table, so one engine can be applied to many objects:
+
+```cpp
+Expressionist::Expressionist ex(EvalMethod::RECURSIVE);
+ex.addConstant("g0", 9.80665);
+
+nlohmann::json a = nlohmann::json::parse(R"({"m": 2, "w": "$m * g0"})");
+ex.evaluate(a);                           // mutates `a` in place
+
+nlohmann::json b = ex.produce(            // returns a new object
+    nlohmann::json::parse(R"({"x": 3, "y": "$x ^ 2"})"));
 ```
 
 ### Choosing a strategy
@@ -264,9 +274,13 @@ shadows a same-named constant.
 
 | Member                                             | Purpose                                   |
 |----------------------------------------------------|-------------------------------------------|
-| `Expressionist(json, EvalMethod = GRAPH)`          | Construct from a JSON object.             |
-| `void evaluate()`                                  | Evaluate in place (mutates the object).   |
-| `json produce() const`                             | Evaluate a copy and return it.            |
+| `Expressionist(json, EvalMethod = RECURSIVE)`      | Construct from a JSON object.             |
+| `Expressionist(std::string, EvalMethod = RECURSIVE)` | Construct by parsing a JSON string (a `const char*` literal binds here too). |
+| `Expressionist(EvalMethod = RECURSIVE)`            | Construct with an empty object, for the by-argument overloads below. |
+| `void evaluate()`                                  | Evaluate the stored object in place.      |
+| `void evaluate(json&) const`                       | Evaluate the given object in place.       |
+| `json produce() const`                             | Evaluate a copy of the stored object and return it. |
+| `json produce(json) const`                         | Evaluate a copy of the given object and return it. |
 | `void setEvalMethod(EvalMethod)` / `getEvalMethod()` | Select / query the strategy.            |
 | `void setTag(const std::string&)` / `tag()`        | Set / query the expression tag.           |
 | `const json& object() const`                       | Access the (possibly evaluated) object.   |

@@ -32,10 +32,16 @@ TEST_CASE("default-constructed engine evaluates external objects") {
 // ---------------------------------------------------------------------------
 
 TEST_CASE("string constructor parses and evaluates JSON") {
-  // std::string is explicit to select this overload over Expressionist(json).
   Engine ex(std::string(R"({"a": 1, "b": 2, "c": "$a + b"})"));
   ex.evaluate();
   CHECK(ex.object()["c"] == 3);
+}
+
+TEST_CASE("a string literal is parsed as JSON, not stored as a json string") {
+  // The const char* overload disambiguates the literal towards JSON parsing.
+  Engine ex(R"({"a": 1, "b": "$a + 1"})");
+  ex.evaluate();
+  CHECK(ex.object()["b"] == 2);
 }
 
 TEST_CASE("string constructor honours the eval method argument") {

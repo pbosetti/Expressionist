@@ -922,6 +922,11 @@ public:
                                    std::string(e.what()));
     }
   }
+  // A string literal is otherwise ambiguous between the json and std::string
+  // constructors (each a single user-defined conversion from const char*).
+  // This exact-match overload disambiguates in favour of JSON parsing.
+  Expressionist(const char *s, EvalMethod method = EvalMethod::RECURSIVE)
+      : Expressionist(std::string(s), method) {}
   Expressionist(EvalMethod method = EvalMethod::RECURSIVE)
       : _evalMethod(method), _symbols(detail::default_symbols()) {}
 
