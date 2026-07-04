@@ -50,6 +50,8 @@ context*.
 - Recurses into nested objects and arrays with **lexical scoping**.
 - An opt-out key (default `"expressionist"`, configurable) lets a subtree
   disable evaluation entirely, leaving large static fragments untouched.
+- An optional plain-C ABI (`libexpressionist_c`) and a `ctypes`-based Python
+  package, for use from outside C++.
 - Clear `ExpressionistException` messages carrying the offending field and
   expression.
 - Consumable via CMake `FetchContent`.
@@ -238,6 +240,54 @@ expressionist --method recursive --tag @ --compact '{"a":1,"b":"@a + 1"}'
 **Exit codes:** `0` on success, `1` on a JSON or evaluation error (e.g. a
 circular dependency or undefined variable, reported with context on stderr),
 and `2` on a usage error (bad option, unknown method, or no input).
+
+## C ABI and Python interface
+
+For use from outside C++, a small `extern "C"` layer (`expressionist_c.h` /
+`libexpressionist_c`) exposes the engine as JSON-string-in, JSON-string-out:
+no C++ type ever crosses the boundary, so it is consumable from any language
+with a C FFI. A `ctypes`-based Python package wraps it.
+
+Both are opt-in and off by default:
+
+```sh
+cmake -Bbuild -GNinja -DEXPRESSIONIST_BUILD_PYTHON=ON
+cmake --build build
+cmake --install build
+```
+
+`EXPRESSIONIST_BUILD_PYTHON` implies `EXPRESSIONIST_BUILD_C_API` and, on
+install, copies `libexpressionist_c` and the `expressionist` Python package
+into `Python3_SITELIB` — the site-packages of whichever `python3` is first on
+`PATH`, so it lands in an active virtualenv automatically. `import
+expressionist` then just works, with no `PYTHONPATH` or `LD_LIBRARY_PATH`
+setup:
+
+```python
+from expressionist import Expressionist, EvalMethod
+
+ex = Expressionist(method=EvalMethod.RECURSIVE)
+ex.set_tag("$")
+result = ex.evaluate({"a": 1, "b": 2, "c": "$a + b"})
+print(result["c"])  # 3
+```
+
+`evaluate()` accepts either a JSON-serializable Python object or a JSON
+string, and always returns a new object without mutating the input — there is
+no persistent "stored object" across the C boundary, unlike the C++ class.
+Errors (parse failures, undefined variables, circular dependencies) raise
+`ExpressionistError` with the same diagnostic text the C++ API produces.
+`Expressionist` is a context manager (`with Expressionist() as ex:`) for
+deterministic native cleanup, though `__del__` covers it too.
+
+To build just the shared library and header (e.g. for a non-Python FFI
+consumer) without the Python install step, use `-DEXPRESSIONIST_BUILD_C_API=ON`
+instead.
+
+If you already have a shared object you'd rather point the Python wrapper at
+(a build-tree artifact, a custom install location), set
+`EXPRESSIONIST_C_LIBRARY` to its path — it takes precedence over the
+next-to-`__init__.py` lookup and the system library search.
 
 ## Expression syntax
 

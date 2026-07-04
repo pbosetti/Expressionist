@@ -28,6 +28,12 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   option(EXPRESSIONIST_BUILD_TESTS "Build the Expressionist test suite" ON)
   option(EXPRESSIONIST_BUILD_EXAMPLES "Build the Expressionist examples" ON)
   option(EXPRESSIONIST_BUILD_TOOL "Build the expressionist command-line tool" OFF)
+  option(EXPRESSIONIST_BUILD_C_API "Build the expressionist_c shared library (plain C ABI)" OFF)
+  option(EXPRESSIONIST_BUILD_PYTHON "Build and install the Python wrapper (implies EXPRESSIONIST_BUILD_C_API)" OFF)
+
+  if(EXPRESSIONIST_BUILD_PYTHON)
+    set(EXPRESSIONIST_BUILD_C_API ON)
+  endif()
 
   if(EXPRESSIONIST_BUILD_EXAMPLES)
     add_executable(expressionist_example example/main.cpp)
@@ -55,6 +61,43 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     target_link_libraries(expressionist_cli PRIVATE expressionist cxxopts::cxxopts)
     target_compile_definitions(expressionist_cli PRIVATE
       EXPRESSIONIST_VERSION="${PROJECT_VERSION}")
+  endif()
+
+  if(EXPRESSIONIST_BUILD_C_API)
+    include(GNUInstallDirs)
+
+    add_library(expressionist_c SHARED src/expressionist_c.cpp)
+    target_include_directories(expressionist_c PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+      $<INSTALL_INTERFACE:include>
+    )
+    target_link_libraries(expressionist_c PRIVATE expressionist)
+    target_compile_definitions(expressionist_c PRIVATE
+      EXPRESSIONIST_C_BUILDING
+      EXPRESSIONIST_VERSION="${PROJECT_VERSION}")
+    set_target_properties(expressionist_c PROPERTIES
+      CXX_VISIBILITY_PRESET hidden
+      VISIBILITY_INLINES_HIDDEN ON
+      VERSION ${PROJECT_VERSION}
+      SOVERSION ${PROJECT_VERSION_MAJOR})
+
+    install(TARGETS expressionist_c
+      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    install(FILES include/expressionist_c.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+  endif()
+
+  if(EXPRESSIONIST_BUILD_PYTHON)
+    # Interpreter is enough to resolve Python3_SITELIB; it honours an active
+    # venv (Python3_FIND_VIRTUALENV defaults to preferring $VIRTUAL_ENV).
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
+    install(FILES python/expressionist/__init__.py
+      DESTINATION ${Python3_SITELIB}/expressionist)
+    install(TARGETS expressionist_c
+      LIBRARY DESTINATION ${Python3_SITELIB}/expressionist
+      RUNTIME DESTINATION ${Python3_SITELIB}/expressionist)
   endif()
 
   if(EXPRESSIONIST_BUILD_TESTS)
