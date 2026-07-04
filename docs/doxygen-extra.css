@@ -1,0 +1,22 @@
+/* Extra stylesheet for the generated Doxygen site only (see Doxyfile's
+ * HTML_EXTRA_STYLESHEET) -- README.md's own rendering on GitHub is
+ * untouched by this file.
+ *
+ * docs/Expressionist.png is 2146x733px: fine as a full-width GitHub README
+ * banner, but Doxygen embeds it unconstrained both as the header logo and
+ * inline on the README-derived mainpage, which overflows the layout badly
+ * on narrow viewports. Cap both placements down to a sane size.
+ */
+
+#projectlogo img {
+  max-height: 48px;
+  width: auto;
+}
+
+.textblock img[src*="Expressionist.png"] {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  margin: 0 auto 1em;
+}

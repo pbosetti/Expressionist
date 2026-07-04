@@ -38,3 +38,7 @@ SORT_MEMBER_DOCS        = NO
 HAVE_DOT                = NO
 QUIET                   = YES
 WARN_AS_ERROR           = FAIL_ON_WARNINGS
+
+# Caps the oversized project logo (see docs/doxygen-extra.css) so it doesn't
+# overflow the layout; does not affect README.md's rendering on GitHub.
+HTML_EXTRA_STYLESHEET   = docs/doxygen-extra.css
