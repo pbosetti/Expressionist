@@ -35,8 +35,20 @@ namespace Expressionist {
 
 using json = nlohmann::json;
 
-enum class EvalMethod { GRAPH, RECURSIVE };
+/// Selects how Expressionist resolves inter-variable dependencies. Both
+/// strategies produce identical results; see \ref Expressionist for how to
+/// select one.
+enum class EvalMethod {
+  GRAPH,     ///< Build a dependency graph and evaluate it in topological
+             ///< order (Kahn's algorithm).
+  RECURSIVE, ///< Evaluate lazily with memoization and a visiting-set for
+             ///< cycle detection.
+};
 
+/// Thrown on any evaluation failure: a JSON parse error, a malformed
+/// expression, an undefined variable or constant, or a circular dependency.
+/// `what()` carries the offending field's path and expression text, e.g.
+/// `In '/a' ("$missing + 1"): Undefined variable or constant: 'missing'`.
 class ExpressionistException : public std::exception {
 public:
   explicit ExpressionistException(std::string message)
@@ -1000,11 +1012,46 @@ private:
 
 } // namespace detail
 
+/// \example main.cpp
+/// Evaluates the same JSON document with both resolution strategies
+/// (Expressionist::EvalMethod::GRAPH and Expressionist::EvalMethod::RECURSIVE)
+/// and prints the results.
+
+/// Evaluates algebraic expressions embedded in `nlohmann::json` string
+/// fields, replacing them in place with their computed values. Variables in
+/// an expression are simply other keys of the same JSON tree, resolved
+/// lexically and in any definition order.
+///
+/// @code{.cpp}
+/// #include <expressionist.hpp>
+/// #include <iostream>
+///
+/// int main() {
+///   nlohmann::json data = nlohmann::json::parse(R"({
+///     "a": 1,
+///     "b": 2,
+///     "c": "$a + b",
+///     "f": "$pi / 3",
+///     "g": "$sin(f) * b"
+///   })");
+///
+///   Expressionist::Expressionist ex(data);
+///   ex.evaluate();                       // mutate the stored object in place
+///   std::cout << ex.object().dump(2) << '\n';
+/// }
+/// @endcode
+///
+/// See the project README (this documentation's main page) for the full
+/// guide: nesting and scoping, the range operator, disabling evaluation for
+/// a subtree, the command-line tool, and the C/Python bindings.
 class Expressionist {
 public:
+  /// Construct from a JSON object, to be mutated/copied by evaluate()/produce().
   Expressionist(json o, EvalMethod method = EvalMethod::RECURSIVE)
       : _object(std::move(o)), _evalMethod(method),
         _symbols(detail::default_symbols()) {}
+  /// Construct by parsing a JSON string. Throws ExpressionistException if
+  /// `s` is not valid JSON.
   Expressionist(std::string s, EvalMethod method = EvalMethod::RECURSIVE)
       : _evalMethod(method), _symbols(detail::default_symbols()) {
     try {
@@ -1017,28 +1064,46 @@ public:
   // A string literal is otherwise ambiguous between the json and std::string
   // constructors (each a single user-defined conversion from const char*).
   // This exact-match overload disambiguates in favour of JSON parsing.
+  /// Same as the `std::string` overload; disambiguates string-literal calls.
   Expressionist(const char *s, EvalMethod method = EvalMethod::RECURSIVE)
       : Expressionist(std::string(s), method) {}
+  /// Construct with an empty stored object, for use with the
+  /// evaluate(json&)/produce(json) overloads below.
   Expressionist(EvalMethod method = EvalMethod::RECURSIVE)
       : _evalMethod(method), _symbols(detail::default_symbols()) {}
 
   ~Expressionist() = default;
 
-  // Evaluate in place, mutating the stored object. Throws
-  // ExpressionistException (with context) on any failure.
+  /// Evaluate the stored object in place. Throws ExpressionistException
+  /// (with context: the offending field's path and expression) on any
+  /// failure -- a malformed expression, an undefined variable or constant,
+  /// or a circular dependency.
   void evaluate() {
     detail::Evaluator ev(_symbols, _tag, _disableKey, _evalMethod);
     ev.run(_object);
   }
 
-  // Evaluate in place, mutating the referenced object. Throws
-  // ExpressionistException (with context) on any failure.
+  /// Like evaluate(), but evaluates and mutates `object` instead of the
+  /// engine's own stored object -- lets one configured engine (tag, disable
+  /// key, symbol table) be reused across many JSON documents:
+  /// @code{.cpp}
+  /// Expressionist::Expressionist ex(EvalMethod::RECURSIVE);
+  /// ex.addConstant("g0", 9.80665);
+  ///
+  /// nlohmann::json a = nlohmann::json::parse(R"({"m": 2, "w": "$m * g0"})");
+  /// ex.evaluate(a); // mutates `a` in place
+  /// @endcode
   void evaluate(json &object) const {
     detail::Evaluator ev(_symbols, _tag, _disableKey, _evalMethod);
     ev.run(object);
   }
 
-  // Like evaluate(), but returns a new object and leaves the original intact.
+  /// Like evaluate(), but returns a new object and leaves the stored object
+  /// intact:
+  /// @code{.cpp}
+  /// Expressionist::Expressionist ex(data);
+  /// nlohmann::json result = ex.produce(); // `data` is left unchanged
+  /// @endcode
   json produce() const {
     json copy = _object;
     detail::Evaluator ev(_symbols, _tag, _disableKey, _evalMethod);
@@ -1046,7 +1111,8 @@ public:
     return copy;
   }
 
-  // Like evaluate(), but returns a new object and leaves the original intact.
+  /// Like evaluate(json&), but returns a new object and leaves `object`
+  /// intact.
   json produce(json object) const {
     json copy = object;
     detail::Evaluator ev(_symbols, _tag, _disableKey, _evalMethod);
@@ -1054,25 +1120,52 @@ public:
     return copy;
   }
 
+  /// Select the resolution strategy; may be changed at any time between
+  /// evaluations.
   void setEvalMethod(EvalMethod method) { _evalMethod = method; }
+  /// The currently selected resolution strategy.
   EvalMethod getEvalMethod() const { return _evalMethod; }
 
+  /// Change the prefix that marks a JSON string as an expression (default
+  /// `"$"`):
+  /// @code{.cpp}
+  /// ex.setTag("@"); // now "@a + 1" is an expression, "$a + 1" a literal
+  /// @endcode
   void setTag(const std::string &tag) { _tag = tag; }
+  /// The currently configured expression tag.
   std::string tag() const { return _tag; }
 
-  // Set to "" to disable the opt-out mechanism entirely.
+  /// Change the key that, set to the literal JSON `false` on an object,
+  /// opts that object and its whole subtree out of evaluation (default
+  /// `"expressionist"`). Pass `""` to turn the mechanism off entirely.
+  /// @code{.cpp}
+  /// // {"expressionist": false, "b": "$a + 1"} is left untouched, recursively.
+  /// ex.setDisableKey("skipEval"); // now "skipEval": false is the opt-out
+  /// @endcode
   void setDisableKey(const std::string &key) { _disableKey = key; }
+  /// The currently configured disable key.
   std::string disableKey() const { return _disableKey; }
 
+  /// Access the (possibly evaluated) stored object.
   const json &object() const { return _object; }
 
-  // Extend the built-in symbol tables.
+  /// Register a named constant usable in expressions, alongside the
+  /// built-in `pi`, `e` and `tau`.
   void addConstant(const std::string &name, double value) {
     _symbols.constants[name] = value;
   }
+  /// Register a named single-argument function usable in expressions.
+  /// @code{.cpp}
+  /// ex.addUnaryFunction("double", [](double x) { return 2.0 * x; });
+  /// @endcode
   void addUnaryFunction(const std::string &name, detail::UnaryFn fn) {
     _symbols.unary[name] = std::move(fn);
   }
+  /// Register a named two-argument function usable in expressions.
+  /// @code{.cpp}
+  /// ex.addBinaryFunction("clampmax",
+  ///                      [](double x, double m) { return std::min(x, m); });
+  /// @endcode
   void addBinaryFunction(const std::string &name, detail::BinaryFn fn) {
     _symbols.binary[name] = std::move(fn);
   }
