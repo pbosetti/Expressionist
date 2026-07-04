@@ -42,6 +42,8 @@ context*.
   (`$a + b` stays `3`, `$pi/3` becomes a double).
 - Arithmetic (`+ - * / ^`), comparisons (`< <= > >= == !=`) and logical
   operators (`&& || !`), with C-style precedence and short-circuiting.
+- A **range operator** that expands `start:stop` (integer) or
+  `start:stop:step` (floating) into a JSON array, endpoint inclusive.
 - A library of mathematical functions and constants, extensible at runtime.
 - Two interchangeable resolution strategies (topological **graph** and
   memoized **recursive**) selectable per instance.
@@ -243,17 +245,43 @@ and `2` on a usage error (bad option, unknown method, or no input).
 | Comparison    | `<  <=  >  >=  ==  !=`                                                     |
 | Logical       | `&&  \|\|  !` (short-circuiting, C-style truthiness)                       |
 | Grouping      | `( … )`                                                                    |
+| Sequences     | `start:stop` (integer, step 1) and `start:stop:step` (floating), endpoint inclusive |
 | Constants     | `pi`, `e`, `tau`                                                           |
 | Unary funcs   | `sin cos tan asin acos atan sinh cosh tanh exp log ln log10 log2 sqrt cbrt abs floor ceil round trunc sign` |
 | Binary funcs  | `pow atan2 hypot min max mod`                                             |
 
-Precedence (lowest → highest): `||`, `&&`, `== !=`, `< <= > >=`, `+ -`, `* /`,
-unary `- !`, `^`, primary. Power binds tighter than unary minus, so `-2^2`
-evaluates to `-4`, and `2^3^2` is `2^(3^2) = 512`.
+Precedence (lowest → highest): range `:`, `||`, `&&`, `== !=`, `< <= > >=`,
+`+ -`, `* /`, unary `- !`, `^`, primary. Power binds tighter than unary minus,
+so `-2^2` evaluates to `-4`, and `2^3^2` is `2^(3^2) = 512`. Because the range
+operator sits at the bottom, its parts are ordinary expressions
+(`0 : 2*pi : pi/6`).
 
 **Result types.** `+ - *` keep integer operands integral; `/` always yields a
 double; `^` stays integral for non-negative integer exponents; comparisons and
-logical operators yield booleans; mathematical functions yield doubles.
+logical operators yield booleans; mathematical functions yield doubles; the
+range operator yields a JSON array.
+
+### Sequences (ranges)
+
+A range expands into a JSON array. The two-part form takes **integer** bounds
+and steps by 1; the three-part form is **floating** and steps by an explicit
+amount. Both are **inclusive** of the endpoint (within rounding), and a step
+pointing away from the endpoint produces an empty array.
+
+```jsonc
+{
+  "ints":  "$1:5",          // -> [1, 2, 3, 4, 5]
+  "halfs": "$0:1:0.25",     // -> [0.0, 0.25, 0.5, 0.75, 1.0]
+  "down":  "$1:0:-0.5",     // -> [1.0, 0.5, 0.0]
+  "angles":"$0:2*pi:pi/2",  // -> [0.0, 1.5707…, 3.1415…, 4.7123…, 6.2831…]
+  "n": 4,
+  "upto":  "$1:n"           // -> [1, 2, 3, 4]  (bounds may be expressions)
+}
+```
+
+A range must be the whole expression: a sequence cannot take part in scalar
+arithmetic (`"$r + 1"` where `r` is a range is an error), the two-part form
+requires integer bounds, and the step of the three-part form must be non-zero.
 
 ### Nesting and scoping
 

@@ -49,10 +49,12 @@ private:
 
 namespace detail {
 
-// A computed value is an integer, a double or a boolean. Preserving the
-// integer/double distinction lets "$a + b" stay integral while "$pi/3" is a
-// float, matching the behaviour documented in PURPOSE.md.
-using Value = std::variant<std::int64_t, double, bool>;
+// A computed value is an integer, a double, a boolean or a sequence. Preserving
+// the integer/double distinction lets "$a + b" stay integral while "$pi/3" is a
+// float, matching the behaviour documented in PURPOSE.md. A sequence (produced
+// by the range operator "start:stop[:step]") is carried as a ready-made JSON
+// array: it may be written into a field but not used in scalar arithmetic.
+using Value = std::variant<std::int64_t, double, bool, json>;
 
 inline bool is_int(const Value &v) {
   return std::holds_alternative<std::int64_t>(v);
@@ -62,12 +64,16 @@ inline bool is_bool_value(const Value &v) {
   return std::holds_alternative<bool>(v);
 }
 
+inline bool is_seq(const Value &v) { return std::holds_alternative<json>(v); }
+
 inline double to_double(const Value &v) {
   if (std::holds_alternative<std::int64_t>(v))
     return static_cast<double>(std::get<std::int64_t>(v));
   if (std::holds_alternative<double>(v))
     return std::get<double>(v);
-  return std::get<bool>(v) ? 1.0 : 0.0;
+  if (std::holds_alternative<bool>(v))
+    return std::get<bool>(v) ? 1.0 : 0.0;
+  throw ExpressionistException("a sequence cannot be used as a number");
 }
 
 inline bool to_bool(const Value &v) {
@@ -75,7 +81,9 @@ inline bool to_bool(const Value &v) {
     return std::get<bool>(v);
   if (std::holds_alternative<std::int64_t>(v))
     return std::get<std::int64_t>(v) != 0;
-  return std::get<double>(v) != 0.0;
+  if (std::holds_alternative<double>(v))
+    return std::get<double>(v) != 0.0;
+  throw ExpressionistException("a sequence cannot be used as a boolean");
 }
 
 inline json to_json(const Value &v) {
@@ -83,7 +91,9 @@ inline json to_json(const Value &v) {
     return json(std::get<std::int64_t>(v));
   if (std::holds_alternative<bool>(v))
     return json(std::get<bool>(v));
-  return json(std::get<double>(v));
+  if (std::holds_alternative<double>(v))
+    return json(std::get<double>(v));
+  return std::get<json>(v);
 }
 
 // ---------------------------------------------------------------------------
@@ -165,6 +175,7 @@ enum class TokType {
   And,
   Or,
   Not,
+  Colon,
   End
 }; // enum class TokType
 
@@ -287,6 +298,8 @@ private:
       return ++_i, Token{TokType::RParen, ")", {}, start};
     case ',':
       return ++_i, Token{TokType::Comma, ",", {}, start};
+    case ':':
+      return ++_i, Token{TokType::Colon, ":", {}, start};
     case '<':
       return ++_i, Token{TokType::Lt, "<", {}, start};
     case '>':
@@ -308,7 +321,16 @@ private:
 // Abstract syntax tree
 // ---------------------------------------------------------------------------
 
-enum class NodeKind { IntLit, FloatLit, BoolLit, Ident, Unary, Binary, Call };
+enum class NodeKind {
+  IntLit,
+  FloatLit,
+  BoolLit,
+  Ident,
+  Unary,
+  Binary,
+  Call,
+  Range
+};
 
 struct Node {
   NodeKind kind;
@@ -326,7 +348,7 @@ public:
       : _tokens(std::move(tokens)), _src(std::move(src)) {}
 
   NodePtr parse() {
-    NodePtr n = parse_or();
+    NodePtr n = parse_range();
     if (!check(TokType::End))
       throw error("unexpected trailing token");
     return n;
@@ -356,6 +378,23 @@ private:
     n->op = op;
     n->children = {std::move(l), std::move(r)};
     return n;
+  }
+
+  // A range is the lowest-precedence construct and appears only at the top of
+  // an expression: "start:stop" (integer bounds, implicit step 1) or
+  // "start:stop:step" (floating). Its parts are ordinary scalar expressions.
+  NodePtr parse_range() {
+    NodePtr first = parse_or();
+    if (!check(TokType::Colon))
+      return first;
+    auto node = std::make_shared<Node>();
+    node->kind = NodeKind::Range;
+    node->children.push_back(first);
+    while (match(TokType::Colon))
+      node->children.push_back(parse_or());
+    if (node->children.size() > 3)
+      throw error("a range has at most three parts (start:stop:step)");
+    return node;
   }
 
   NodePtr parse_or() {
@@ -605,6 +644,43 @@ inline Value eval_node(const NodePtr &n, const Symbols &sym,
     default:
       throw ExpressionistException("Internal error: bad binary operator");
     }
+  }
+  case NodeKind::Range: {
+    if (n->children.size() == 2) {
+      Value a = eval_node(n->children[0], sym, resolve);
+      Value b = eval_node(n->children[1], sym, resolve);
+      if (!is_int(a) || !is_int(b))
+        throw ExpressionistException(
+            "Binary range 'start:stop' requires integer bounds");
+      std::int64_t start = std::get<std::int64_t>(a);
+      std::int64_t stop = std::get<std::int64_t>(b);
+      json arr = json::array();
+      for (std::int64_t v = start; v <= stop; ++v)
+        arr.push_back(v);
+      return Value(std::in_place_type<json>, std::move(arr));
+    }
+    if (n->children.size() == 3) {
+      double start = to_double(eval_node(n->children[0], sym, resolve));
+      double stop = to_double(eval_node(n->children[1], sym, resolve));
+      double step = to_double(eval_node(n->children[2], sym, resolve));
+      if (step == 0.0)
+        throw ExpressionistException("Range step must be non-zero");
+      json arr = json::array();
+      double span = stop - start;
+      // Generate only when the step points from start towards stop; a step in
+      // the wrong direction yields an empty sequence rather than diverging. The
+      // small epsilon keeps the endpoint inclusive despite rounding, so
+      // "0:1:0.1" ends exactly at 1.
+      if (span == 0.0 || (span > 0.0) == (step > 0.0)) {
+        std::int64_t count =
+            static_cast<std::int64_t>(std::floor(span / step + 1e-9));
+        for (std::int64_t i = 0; i <= count; ++i)
+          arr.push_back(start + static_cast<double>(i) * step);
+      }
+      return Value(std::in_place_type<json>, std::move(arr));
+    }
+    throw ExpressionistException(
+        "A range must have two (start:stop) or three (start:stop:step) parts");
   }
   case NodeKind::Call: {
     const std::string &fn = n->name;

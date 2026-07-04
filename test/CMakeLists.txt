@@ -21,6 +21,7 @@ set(EXPRESSIONIST_TEST_SOURCES
   test_nested.cpp
   test_produce.cpp
   test_overloads.cpp
+  test_ranges.cpp
   test_benchmark.cpp
 )
 
