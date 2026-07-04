@@ -41,3 +41,18 @@ endif()
 
 include(${doctest_SOURCE_DIR}/scripts/cmake/doctest.cmake)
 doctest_discover_tests(expressionist_tests)
+
+if(EXPRESSIONIST_BUILD_PYTHON)
+  execute_process(
+    COMMAND ${Python3_EXECUTABLE} -c "import pytest"
+    RESULT_VARIABLE EXPRESSIONIST_PYTEST_MISSING
+    OUTPUT_QUIET ERROR_QUIET)
+  if(EXPRESSIONIST_PYTEST_MISSING EQUAL 0)
+    add_test(NAME python_c_api_tests
+      COMMAND ${Python3_EXECUTABLE} -m pytest ${CMAKE_CURRENT_SOURCE_DIR}/python -q)
+    set_tests_properties(python_c_api_tests PROPERTIES
+      ENVIRONMENT "EXPRESSIONIST_C_LIBRARY=$<TARGET_FILE:expressionist_c>;PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/../python")
+  else()
+    message(STATUS "pytest not found for ${Python3_EXECUTABLE}; skipping Python C-API tests")
+  endif()
+endif()
