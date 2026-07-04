@@ -19,6 +19,7 @@ set(EXPRESSIONIST_TEST_SOURCES
   test_ordering.cpp
   test_errors.cpp
   test_nested.cpp
+  test_disable.cpp
   test_produce.cpp
   test_overloads.cpp
   test_ranges.cpp

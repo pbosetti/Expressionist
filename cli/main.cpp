@@ -48,6 +48,8 @@ int main(int argc, char **argv) {
           cxxopts::value<std::string>()->default_value("graph"))
       ("t,tag", "Prefix that marks a string as an expression",
           cxxopts::value<std::string>()->default_value("$"))
+      ("disable-key", "Object key that, set to false, opts its subtree out of evaluation",
+          cxxopts::value<std::string>()->default_value("expressionist"))
       ("indent", "Number of spaces for pretty-printing the output",
           cxxopts::value<int>()->default_value("2"))
       ("c,compact", "Emit compact, single-line JSON (overrides --indent)",
@@ -111,6 +113,7 @@ int main(int argc, char **argv) {
   try {
     Expressionist::Expressionist ex(std::move(input_text), method);
     ex.setTag(args["tag"].as<std::string>());
+    ex.setDisableKey(args["disable-key"].as<std::string>());
     output = ex.produce();
   } catch (const Expressionist::ExpressionistException &e) {
     std::cerr << "expressionist: " << e.what() << "\n";

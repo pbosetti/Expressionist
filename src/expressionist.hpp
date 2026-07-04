@@ -714,8 +714,10 @@ inline Value eval_node(const NodePtr &n, const Symbols &sym,
 
 class Evaluator {
 public:
-  Evaluator(const Symbols &sym, std::string tag, EvalMethod method)
-      : _sym(sym), _tag(std::move(tag)), _method(method) {}
+  Evaluator(const Symbols &sym, std::string tag, std::string disableKey,
+            EvalMethod method)
+      : _sym(sym), _tag(std::move(tag)), _disableKey(std::move(disableKey)),
+        _method(method) {}
 
   void run(json &root) {
     _cells.clear();
@@ -752,6 +754,17 @@ private:
     return !_tag.empty() && s.rfind(_tag, 0) == 0;
   }
 
+  // An object opts its whole subtree out of evaluation by carrying a
+  // `disableKey: false` member (default key: "expressionist"). The check
+  // looks only at the literal JSON value, never at an evaluated result, so it
+  // works uniformly regardless of definition order or evaluation strategy.
+  bool is_disabled(const json &value) const {
+    if (_disableKey.empty())
+      return false;
+    auto it = value.find(_disableKey);
+    return it != value.end() && *it == false;
+  }
+
   std::size_t add_cell(json &value, Scope *scope, const std::string &path) {
     std::size_t idx = _cells.size();
     _cells.emplace_back();
@@ -779,6 +792,8 @@ private:
 
   void walk(json &value, Scope *enclosing, const std::string &path) {
     if (value.is_object()) {
+      if (is_disabled(value))
+        return; // leave this object and everything under it untouched
       _scopes.emplace_back();
       Scope *scope = &_scopes.back();
       scope->parent = enclosing;
@@ -977,6 +992,7 @@ private:
 
   const Symbols &_sym;
   std::string _tag;
+  std::string _disableKey;
   EvalMethod _method;
   std::deque<Scope> _scopes; // stable addresses for Scope*
   std::vector<Cell> _cells;
@@ -1011,21 +1027,21 @@ public:
   // Evaluate in place, mutating the stored object. Throws
   // ExpressionistException (with context) on any failure.
   void evaluate() {
-    detail::Evaluator ev(_symbols, _tag, _evalMethod);
+    detail::Evaluator ev(_symbols, _tag, _disableKey, _evalMethod);
     ev.run(_object);
   }
 
   // Evaluate in place, mutating the referenced object. Throws
   // ExpressionistException (with context) on any failure.
   void evaluate(json &object) const {
-    detail::Evaluator ev(_symbols, _tag, _evalMethod);
+    detail::Evaluator ev(_symbols, _tag, _disableKey, _evalMethod);
     ev.run(object);
   }
 
   // Like evaluate(), but returns a new object and leaves the original intact.
   json produce() const {
     json copy = _object;
-    detail::Evaluator ev(_symbols, _tag, _evalMethod);
+    detail::Evaluator ev(_symbols, _tag, _disableKey, _evalMethod);
     ev.run(copy);
     return copy;
   }
@@ -1033,7 +1049,7 @@ public:
   // Like evaluate(), but returns a new object and leaves the original intact.
   json produce(json object) const {
     json copy = object;
-    detail::Evaluator ev(_symbols, _tag, _evalMethod);
+    detail::Evaluator ev(_symbols, _tag, _disableKey, _evalMethod);
     ev.run(copy);
     return copy;
   }
@@ -1043,6 +1059,10 @@ public:
 
   void setTag(const std::string &tag) { _tag = tag; }
   std::string tag() const { return _tag; }
+
+  // Set to "" to disable the opt-out mechanism entirely.
+  void setDisableKey(const std::string &key) { _disableKey = key; }
+  std::string disableKey() const { return _disableKey; }
 
   const json &object() const { return _object; }
 
@@ -1061,6 +1081,7 @@ private:
   json _object = json::object();
   EvalMethod _evalMethod = EvalMethod::RECURSIVE;
   std::string _tag = "$";
+  std::string _disableKey = "expressionist";
   detail::Symbols _symbols;
 }; // class Expressionist
 

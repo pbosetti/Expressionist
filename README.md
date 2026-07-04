@@ -48,6 +48,8 @@ context*.
 - Two interchangeable resolution strategies (topological **graph** and
   memoized **recursive**) selectable per instance.
 - Recurses into nested objects and arrays with **lexical scoping**.
+- An opt-out key (default `"expressionist"`, configurable) lets a subtree
+  disable evaluation entirely, leaving large static fragments untouched.
 - Clear `ExpressionistException` messages carrying the offending field and
   expression.
 - Consumable via CMake `FetchContent`.
@@ -222,6 +224,7 @@ Every class option is exposed as a flag:
 |---------------------|---------------------------------------------------------|-----------|
 | `-m, --method arg`  | Evaluation strategy: `graph` or `recursive`             | `graph`   |
 | `-t, --tag arg`     | Prefix that marks a string as an expression             | `$`       |
+| `--disable-key arg` | Object key that, set to `false`, opts its subtree out of evaluation | `expressionist` |
 | `--indent arg`      | Spaces used when pretty-printing the output             | `2`       |
 | `-c, --compact`     | Emit compact, single-line JSON (overrides `--indent`)   | off       |
 | `-h, --help`        | Print usage and exit                                    |           |
@@ -300,6 +303,39 @@ shadows a same-named constant.
 }
 ```
 
+### Disabling evaluation for a subtree
+
+An object opts itself and everything nested inside it out of evaluation by
+carrying a member set to the literal boolean `false` under the **disable key**
+(default `"expressionist"`). The whole subtree is then left byte-for-byte
+untouched — nothing inside is even inspected for the expression tag — which
+makes it cheap to mark a large, static JSON fragment as a no-op instead of
+tagging every nested object individually. The flag itself is left in the
+output, and its enclosing scope is otherwise unaffected:
+
+```jsonc
+{
+  "a": 1,
+  "c": "$a + 10",                 // -> 11, evaluated normally
+  "frozen": {
+    "expressionist": false,
+    "b": "$a + 1",                // left as the literal string "$a + 1"
+    "inner": { "d": "$a + 2" }    // untouched too, however deeply nested
+  }
+}
+```
+
+Only a literal `false` disables evaluation — `true`, a missing key, or any
+non-boolean value leaves the object evaluated as usual. Setting the flag on
+the root object turns the whole document into a no-op (this does not apply to
+a root-level JSON *array*, which has no keys to carry the flag). The key name
+is configurable, and setting it to `""` turns the mechanism off entirely:
+
+```cpp
+ex.setDisableKey("skipEval");   // now "skipEval": false is the opt-out
+ex.setDisableKey("");           // opt-out mechanism disabled
+```
+
 ## API summary
 
 | Member                                             | Purpose                                   |
@@ -313,6 +349,7 @@ shadows a same-named constant.
 | `json produce(json) const`                         | Evaluate a copy of the given object and return it. |
 | `void setEvalMethod(EvalMethod)` / `getEvalMethod()` | Select / query the strategy.            |
 | `void setTag(const std::string&)` / `tag()`        | Set / query the expression tag.           |
+| `void setDisableKey(const std::string&)` / `disableKey()` | Set / query the opt-out key (`""` turns it off). |
 | `const json& object() const`                       | Access the (possibly evaluated) object.   |
 | `addConstant(name, value)`                         | Register a constant.                      |
 | `addUnaryFunction(name, fn)`                       | Register a `double(double)` function.     |
