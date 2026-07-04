@@ -419,6 +419,19 @@ ctest --test-dir build --output-on-failure
 This also builds `example/main.cpp` (`build/expressionist_example`), which
 prints the PURPOSE.md object evaluated with both strategies.
 
+## Documentation
+
+Published from `main` at <https://pbosetti.github.io/Expressionist/>. It
+covers the public API only: `Expressionist::Expressionist`,
+`Expressionist::EvalMethod`, `Expressionist::ExpressionistException` and the
+C ABI in `expressionist_c.h` — not the internal tokenizer/parser/evaluator.
+
+To build it locally:
+
+```sh
+doxygen Doxyfile   # generates doc/html (gitignored, not versioned)
+```
+
 ## Benchmark
 
 The test suite includes a benchmark comparing the two strategies on large

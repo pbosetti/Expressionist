@@ -1,3 +1,5 @@
 /*build*/
-.claude__pycache__/
+.claude
+__pycache__/
 *.pyc
+/doc/

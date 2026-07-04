@@ -1,0 +1,40 @@
+# Doxyfile for Expressionist -- only the settings that differ from Doxygen's
+# built-in defaults are listed; see `doxygen -g -` for the full default set.
+#
+# Usage:
+#   doxygen Doxyfile        # generates doc/html (not versioned, see .gitignore)
+
+PROJECT_NAME           = "Expressionist"
+PROJECT_BRIEF          = "Header-only C++20 evaluator of algebraic expressions embedded in JSON fields"
+PROJECT_LOGO           = docs/Expressionist.png
+OUTPUT_DIRECTORY       = doc
+
+# --- Input: the public API surface only -------------------------------------
+# README.md is included so USE_MDFILE_AS_MAINPAGE can promote it to the
+# generated site's index page. The `detail` namespace (tokenizer, parser,
+# AST, evaluator) is implementation and is excluded below.
+INPUT                  = README.md src/expressionist.hpp include/expressionist_c.h
+USE_MDFILE_AS_MAINPAGE = README.md
+RECURSIVE              = NO
+EXCLUDE_SYMBOLS         = Expressionist::detail Expressionist::detail::*
+
+# Only entities carrying a documentation comment are extracted, so
+# implementation details left uncommented (or excluded above) do not leak
+# undocumented stub pages into the output.
+EXTRACT_ALL             = NO
+HIDE_UNDOC_MEMBERS      = YES
+HIDE_UNDOC_CLASSES      = YES
+CASE_SENSE_NAMES        = YES
+
+# --- Examples ----------------------------------------------------------------
+# Referenced from doc comments via `\example main.cpp`.
+EXAMPLE_PATH            = example
+EXAMPLE_PATTERNS        = *.cpp
+
+# --- Output --------------------------------------------------------------
+GENERATE_LATEX          = NO
+GENERATE_TREEVIEW       = YES
+SORT_MEMBER_DOCS        = NO
+HAVE_DOT                = NO
+QUIET                   = YES
+WARN_AS_ERROR           = FAIL_ON_WARNINGS
